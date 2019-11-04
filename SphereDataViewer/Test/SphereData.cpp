@@ -8,7 +8,7 @@
 using namespace std;
 
 #define PARALLEL 1
-#define NUM_THREAD 4
+#define NUM_THREAD 16
 
 CSphereData::CSphereData(const char* szFilename)
 {
@@ -49,12 +49,34 @@ CSphereData::~CSphereData()
 
 }
 
-void UpdateSphere(float s, float c, std::vector<SSphereElement>::iterator it)
+void UpdateSphere(float s, float c, std::vector<SSphereElement>::iterator it, std::vector<SSphereElement>::iterator end)
 {
+	for (it; it != end; ++it)
+	{
+		SSphereElement& ref = *it;
+		ref.screenZ = ref.x * c + ref.z * s;
 
+		float fX = ref.x * s - ref.z * c;
+		float fY = ref.y;	// we rotate spheres only for y-axis
+		float fZ = ref.screenZ;
+
+		fZ += 1.5f;
+
+		if (fZ < 0.001f)
+			continue;
+
+		float fScreenX = fX / fZ;
+		float fScreenY = fY / fZ;
+		float fScreenZ = fZ;
+		float fScreenRadius = ref.r / fZ;
+
+		// store the screen information for using in render pass
+		ref.screenX = fScreenX;
+		ref.screenY = fScreenY;
+		ref.screenZ = fScreenZ;
+		ref.screenRadius = fScreenRadius;
+	}
 }
-
-
 
 void CSphereData::Render(CFrameBuffer* fb, float wi)
 {
@@ -67,9 +89,14 @@ void CSphereData::Render(CFrameBuffer* fb, float wi)
 	auto Iter = m_SphereData.begin();
 	int nSizePerThread = m_SphereData.size() / NUM_THREAD;
 	thread t[NUM_THREAD];
-	for (int i = 0; i < nSizePerThread; i++)
+	for (int i = 0; i < NUM_THREAD; i++)
 	{
-		t[i] = thread(&UpdateSphere, s, c, Iter + i * nSizePerThread);
+		t[i] = thread(&UpdateSphere, s, c, Iter + i * nSizePerThread, Iter + (i + 1) * nSizePerThread);
+	}
+
+	for (int i = 0; i < NUM_THREAD; i++)
+	{
+		t[i].join();
 	}
 #else
 	for (it = m_SphereData.begin(); it != end; ++it)
