@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <algorithm>
+#include <thread>
+using namespace std;
+
+#define PARALLEL 1
+#define NUM_THREAD 4
 
 CSphereData::CSphereData(const char* szFilename)
 {
@@ -44,6 +49,13 @@ CSphereData::~CSphereData()
 
 }
 
+void UpdateSphere(float s, float c, std::vector<SSphereElement>::iterator it)
+{
+
+}
+
+
+
 void CSphereData::Render(CFrameBuffer* fb, float wi)
 {
 	std::vector<SSphereElement>::iterator it, end = m_SphereData.end();
@@ -51,6 +63,15 @@ void CSphereData::Render(CFrameBuffer* fb, float wi)
 	float s = sin(wi);
 	float c = cos(wi);
 
+#if PARALLEL
+	auto Iter = m_SphereData.begin();
+	int nSizePerThread = m_SphereData.size() / NUM_THREAD;
+	thread t[NUM_THREAD];
+	for (int i = 0; i < nSizePerThread; i++)
+	{
+		t[i] = thread(&UpdateSphere, s, c, Iter + i * nSizePerThread);
+	}
+#else
 	for (it = m_SphereData.begin(); it != end; ++it)
 	{
 		SSphereElement& ref = *it;
@@ -76,6 +97,7 @@ void CSphereData::Render(CFrameBuffer* fb, float wi)
 		ref.screenZ = fScreenZ;
 		ref.screenRadius = fScreenRadius;
 	}
+#endif
 
 	fb->renderFrameBuffer(m_SphereData);
 }
